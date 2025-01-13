@@ -1,12 +1,14 @@
 {
-  "AutoApplyDefaultProfile": false,
+  "AutoApplyDefaultProfile": true,
   "DefaultProfile": "AllCore",
+  "FrequencyOnlyProfile": "Frequency",
   "Profiles": [
     {
       // Calculate affinity mask hex using https://bitsum.com/tools/cpu-affinity-calculator/
       "Name": "Cache",
       "Description": "Cache profile on CCD0 with 3dvcache. Processors 0-15.",
       "AffinityMaskHex": "0x000000000000FFFF",
+      "ExclusiveCacheOnly": true,
       "DelayMS": 0
     },
     {
@@ -31,12 +33,14 @@
       "Name": "Cache_Delay1s",
       "Description": "Cache profile on CCD0 with 3dvcache with 1s delay. Processors 0-15.",
       "AffinityMaskHex": "0x000000000000FFFF",
+      "ExclusiveCacheOnly": true,
       "DelayMS": 1000
     },
     {
       "Name": "CacheNoHT",
       "Description": "Cache profile on CCD0 with 3dvcache. Non-hyperthread cores only.",
       "AffinityMaskHex": "0x0000000000005555",
+      "ExclusiveCacheOnly": true,
       "DelayMS": 0
     }
   ],

@@ -1,4 +1,12 @@
-# Lasso Process Manager
+# Lasso Process Manager - @datasone fork
+
+## About this fork
+This fork adds feature to auto switch background programs between `Frequency` profile and their default profiles. Minimizing performance impact by background tasks interfering game processes.
+
+Enable the feature by setting `ExclusiveCacheOnly` on cache profiles, when programs matching these profiles are running, the background programs will be kicked to pre-set `FrequencyOnlyProfile`.
+And after all programs with `ExclusiveCacheOnly` profiles exited, other programs will be set back to their default profiles (**if set**, thus it's recommended to enable `AutoApplyDefaultProfile`)
+
+# Original README
 
 ## What is this?
 This is a little project I tossed together for fun after getting an AMD 7950x3D cpu. I had some issues with my bios bugging the threadmanagement when PBO is enabled.

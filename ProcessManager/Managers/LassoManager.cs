@@ -12,10 +12,13 @@ namespace ProcessManager.Managers
         private Dictionary<string, LassoProfile> lassoProfiles;
         private List<BaseRule> rules;
         private ManagerConfig config;
-        private ManagementEventWatcher processStartEvent;
+        private ManagementEventWatcher processStartEvent, processStopEvent;
         private ILogger logger;
 
         private IConfigProvider ConfigProvider { get; set; }
+
+        private List<int> processesWithMove = [];
+        private LassoProfile? frequencyOnlyProfile;
 
         public LassoManager(IConfigProvider configProvider, ILogger logger)
         {
@@ -25,11 +28,18 @@ namespace ProcessManager.Managers
 
         public void Dispose()
         {
-            if (processStartEvent != null) 
+            if (processStartEvent != null)
             {
                 processStartEvent.EventArrived -= ProcessStartEvent_EventArrived;
                 processStartEvent.Dispose();
                 processStartEvent = null;
+            }
+
+            if (processStopEvent != null)
+            {
+                processStopEvent.EventArrived -= ProcessStartEvent_EventArrived;
+                processStopEvent.Dispose();
+                processStopEvent = null;
             }
         }
 
@@ -44,7 +54,9 @@ namespace ProcessManager.Managers
             catch
             {
                 logger.Log(LogLevel.Error, $"Exception with initial setup. Cannot continue. Check for errors");
+                throw new Exception();
             }
+
             return false;
         }
 
@@ -66,15 +78,25 @@ namespace ProcessManager.Managers
             config = ConfigProvider.GetManagerConfig();
             rules = ConfigProvider.GetRules();
             lassoProfiles = ConfigProvider.GetLassoProfiles();
+            
+            if (config.FrequencyOnlyProfile != null && lassoProfiles.ContainsKey(config.FrequencyOnlyProfile))
+            {
+                frequencyOnlyProfile = lassoProfiles[config.FrequencyOnlyProfile];
+            }
         }
 
-        private void SetupProfilesForAllProcesses()
+        private void SetupProfilesForAllProcesses(bool ExclusiveCacheMode = false)
         {
             int failCount = 0;
             var successCount = new Dictionary<string, int>();
             foreach (var process in Process.GetProcesses())
             {
                 var lassoProfile = GetLassoProfileForProcess(process);
+                if (ExclusiveCacheMode && frequencyOnlyProfile != null && !lassoProfile.ExclusiveCacheOnly)
+                {
+                    lassoProfile = frequencyOnlyProfile;
+                }
+
                 bool success = TrySetProcessProfile(process, lassoProfile, out string profileName);
 
                 if (success)
@@ -94,7 +116,8 @@ namespace ProcessManager.Managers
                 }
             }
 
-            logger.Log(LogLevel.Information, string.Join(". ", successCount.Select(e => $"{e.Key}: {e.Value} processes")));
+            logger.Log(LogLevel.Information,
+                string.Join(". ", successCount.Select(e => $"{e.Key}: {e.Value} processes")));
             logger.Log(LogLevel.Information, $"{failCount} processes failed to set profile.");
         }
 
@@ -109,16 +132,18 @@ namespace ProcessManager.Managers
             }
 
             try
-            {   
-                process.ProcessorAffinity = (IntPtr)lassoProfile.GetAffinityMask();
+            {
+                process.ProcessorAffinity = (IntPtr) lassoProfile.GetAffinityMask();
 
-                logger.Log(LogLevel.Information, $"Applied profile '{lassoProfile.Name}' on Process '{process.ProcessName}' (ID:{process.Id}).");
+                logger.Log(LogLevel.Information,
+                    $"Applied profile '{lassoProfile.Name}' on Process '{process.ProcessName}' (ID:{process.Id}).");
                 profileName = lassoProfile.Name;
                 return true;
             }
             catch
             {
-                logger.Log(LogLevel.Error, $"Failed to set profile for Process '{process.ProcessName}' (ID:{process.Id}).");
+                logger.Log(LogLevel.Error,
+                    $"Failed to set profile for Process '{process.ProcessName}' (ID:{process.Id}).");
                 return false;
             }
         }
@@ -161,6 +186,9 @@ namespace ProcessManager.Managers
             processStartEvent = new ManagementEventWatcher("SELECT * FROM Win32_ProcessStartTrace");
             processStartEvent.EventArrived += ProcessStartEvent_EventArrived;
             processStartEvent.Start();
+            processStopEvent = new ManagementEventWatcher("SELECT * FROM Win32_ProcessStopTrace");
+            processStopEvent.EventArrived += ProcessStopEvent_EventArrived;
+            processStopEvent.Start();
         }
 
         private async void ProcessStartEvent_EventArrived(object sender, EventArrivedEventArgs e)
@@ -180,6 +208,16 @@ namespace ProcessManager.Managers
                         await Task.Delay(lassoProfile.DelayMS);
                     }
 
+                    if (lassoProfile.ExclusiveCacheOnly)
+                    {
+                        processesWithMove.Add(processId);
+                        SetupProfilesForAllProcesses(true);
+                    }
+                    else if (processesWithMove.Count > 0 && frequencyOnlyProfile != null)
+                    {
+                        lassoProfile = frequencyOnlyProfile;
+                    }
+
                     TrySetProcessProfile(process, lassoProfile, out _);
                 }
                 else
@@ -187,7 +225,29 @@ namespace ProcessManager.Managers
                     //logger.Log(LogLevel.Information, $"No profile applied on Process '{process.ProcessName}' (ID:{process.Id}).");
                 }
             }
-            catch { }
+            catch
+            {
+            }
+        }
+
+        private void ProcessStopEvent_EventArrived(object sender, EventArrivedEventArgs e)
+        {
+            try
+            {
+                if (processesWithMove.Count > 0)
+                {
+                    var processId = Convert.ToInt32(e.NewEvent.Properties["ProcessID"].Value);
+                    processesWithMove.Remove(processId);
+
+                    if (processesWithMove.Count == 0)
+                    {
+                        SetupProfilesForAllProcesses();
+                    }
+                }
+            }
+            catch
+            {
+            }
         }
     }
 }

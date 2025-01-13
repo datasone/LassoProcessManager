@@ -1,4 +1,6 @@
-﻿namespace ProcessManager.Models.Configs
+﻿using System.ComponentModel;
+
+namespace ProcessManager.Models.Configs
 {
     public class LassoProfile
     {
@@ -31,5 +33,12 @@
 
             return affinityMask;
         }
+        
+        /// <summary>
+        /// Profile with this set to true will be treated "exclusive" cache profile,
+        /// processes not belong to this profile type will be moved to FrequencyOnlyProfile.
+        /// </summary>
+        [DefaultValue(false)]
+        public bool ExclusiveCacheOnly { get; set; }
     }
 }

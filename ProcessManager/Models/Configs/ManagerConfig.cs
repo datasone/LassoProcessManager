@@ -15,6 +15,11 @@ namespace ProcessManager.Models.Configs
         public string DefaultProfile { get; set; }
 
         /// <summary>
+        /// A profile with only frequency CCD cores.
+        /// </summary>
+        public string FrequencyOnlyProfile { get; set; }
+        
+        /// <summary>
         /// Available Lasso profiles.
         /// </summary>
         public LassoProfile[] Profiles { get; set; }
