@@ -65,6 +65,6 @@ namespace ProcessManager.Providers
         }
 
         private string GetConfigFilePath()
-            => Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), ConfigFileName);
+            => Path.Combine(Path.GetDirectoryName(Environment.ProcessPath), ConfigFileName);
     }
 }
